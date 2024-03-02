@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport"
+          content="width=device-width, user-scalable=no, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <link href="/static/bootstrap.css" rel="stylesheet">
+    <link type="text/css" rel="stylesheet" href="/static/main.css">
+    <title>Home</title>
+</head>
+<body>
+<nav class="navbar sticky-top navbar-expand-lg text-body-tertiary mb-5" style="background-color: #66BB6A">
+    <div class="container-fluid">
+        <a href="#" class="navbar-brand">Forum</a>
+        <div class="d-flex">
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarContent" aria-controls="navbarContent" aria-expanded="false" aria-label="Toggle navigation">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarContent">
+                <ul class="navbar-nav me-auto mb-2 mb-lg-0">
+                    <li class="nav-item">
+                        <div class="nav-item dropdown">
+                            <a href="#" class="nav-link dropdown-toggle" role="button" data-bs-toggle="dropdown" aria-expanded="false">Categories</a>
+                            <!-- Dynamically display categories -->
+                            <ul class="dropdown-menu">
+                                {{ range .Categories }}
+                                <li><a href="/category/{{ .ID }}" class="dropdown-item">{{ .Name }}</a></li>
+                                {{ end }}
+                            </ul>
+                        </div>
+                    </li>
+                    <li class="nav-item">
+                        <a href="/createPostPage" class="nav-link">Create a Post</a>
+                    </li>
+                    <li class="nav-item">
+                        <a href="/createCategoryPage" class="nav-link">Create a Category</a>
+                    </li>
+                    <li class="nav-item">
+                        <a href="loginPage" class="nav-link">Login</a>
+                    </li>
+                    <li class="nav-item">
+                        <a href="registerPage" class="nav-link">Register</a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</nav>
+
+<main>
+    <div class="container">
+        <!-- Dynamically display posts drawn from database -->
+        {{ range .Posts }}
+        <div class="card mb-2">
+            <div class="card-header">
+                <h5 class="card-title m-2">{{ .Subject }}</h5>
+            </div>
+            <div class="card-body">
+                <p class="card-text">{{ .Content }}</p>
+            </div>
+            <div class="card-footer">
+                {{ range .Categories }}
+                <span> {{ .Name }} </span>
+                {{ end }}
+            </div>
+        </div>
+        {{ end }}
+    </div>
+</main>
+
+<footer class="navbar sticky-bottom bg-body-secondary">
+    <div class="container-fluid">
+        © 2024
+    </div>
+</footer>
+<script src="/static/bootstrap.js"></script>
+<script src="/static/bootstrap.bundle.js"></script>
+</body>
+</html>
