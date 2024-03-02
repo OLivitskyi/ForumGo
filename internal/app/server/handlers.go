@@ -14,7 +14,7 @@ var templates = template.Must(template.ParseGlob("./web/templates/*.html"))
 func (s *server) HandlePaths() {
 	s.router.Handle("/static/", s.serveStatic())
 	s.router.HandleFunc("/", s.home())
-	s.router.HandleFunc("/register", s.registerPage())
+	s.router.HandleFunc("/registerPage", s.registerPage())
 	s.router.HandleFunc("/saveUser", s.saveRegister())
 	s.router.HandleFunc("/loginPage", s.loginPage())
 	s.router.HandleFunc("/login", s.login())
