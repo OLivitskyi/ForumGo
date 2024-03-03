@@ -16,3 +16,7 @@ type PostRepository interface {
 	GetCategories(postID string) ([]*model.Category, error)
 	GetByCategory(categoryID int) ([]*model.Post, error)
 }
+type CommentRepository interface {
+	Create(c *model.Comment) error
+	GetByPostID(postID string) ([]*model.Comment, error)
+}

@@ -54,10 +54,8 @@
         </div>
     </div>
 </nav>
-
 <main>
     <div class="container">
-        <!-- Dynamically display posts drawn from database -->
         {{ range .Posts }}
         <div class="card mb-2">
             <div class="card-header">
@@ -67,16 +65,39 @@
             <div class="card-body">
                 <p class="card-text">{{ .Content }}</p>
             </div>
-            <div class="card-footer">
+            <div class="card-footer bg-light">
+                <h6>Categories:</h6>
                 {{ range .Categories }}
                 <span> {{ .Name }} </span>
                 {{ end }}
+            </div>
+
+            <!-- Display comments for the post -->
+            {{ range .Comments }}
+            <div class="card bg-light m-3">
+                <div class="card-header">
+                    <strong>{{ .User.UserName }}</strong> commented:
+                </div>
+                <div class="card-body">
+                    <p class="card-text">{{ .Content }}</p>
+                </div>
+            </div>
+            {{ end }}
+
+            <!-- Comment form -->
+            <div class="card-body">
+                <form method="post" action="/createComment">
+                    <input type="hidden" name="postID" value="{{ .ID }}" />
+                    <div class="mb-2">
+                        <input type="text" class="form-control" id="commentText" name="commentText">
+                    </div>
+                    <button type="submit" class="btn btn-primary mt-3">Add comment</button>
+                </form>
             </div>
         </div>
         {{ end }}
     </div>
 </main>
-
 <footer class="navbar sticky-bottom bg-body-secondary">
     <div class="container-fluid">
         © 2024

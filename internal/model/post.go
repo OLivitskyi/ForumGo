@@ -1,14 +1,19 @@
 package model
 
-import "github.com/gofrs/uuid"
+import (
+	"github.com/gofrs/uuid"
+	"time"
+)
 
 type Post struct {
-	ID         string      `json:"id"`
-	UserID     string      `json:"user_id"`
-	Subject    string      `json:"subject"`
-	Content    string      `json:"content"`
-	Categories []*Category `json:"categories"` // Updated to []*Category
+	ID         string
+	UserID     string
 	User       *User
+	Subject    string
+	Content    string
+	Categories []*Category
+	Comments   []*Comment
+	CreatedAt  time.Time
 }
 
 func NewPost(userID, subject, content string) (*Post, error) {
@@ -22,6 +27,7 @@ func NewPost(userID, subject, content string) (*Post, error) {
 		UserID:     userID,
 		Subject:    subject,
 		Content:    content,
+		CreatedAt:  time.Now(),           // Add current time
 		Categories: make([]*Category, 0), // Initialize slice of *Category
 	}, nil
 }

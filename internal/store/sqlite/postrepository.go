@@ -2,6 +2,7 @@ package sqlite
 
 import (
 	"Forum/internal/model"
+	"database/sql"
 	"log"
 )
 
@@ -16,7 +17,7 @@ func (r *PostRepository) AddCategoryToPost(postID string, categoryID int) error 
 }
 
 func (r *PostRepository) GetAll() ([]*model.Post, error) {
-	rows, err := r.store.Db.Query("SELECT id, user_UUID, subject, content FROM posts")
+	rows, err := r.store.Db.Query("SELECT id, user_UUID, subject, content, created_at FROM posts")
 	if err != nil {
 		return nil, err
 	}
@@ -25,18 +26,35 @@ func (r *PostRepository) GetAll() ([]*model.Post, error) {
 	posts := make([]*model.Post, 0)
 	for rows.Next() {
 		var p model.Post
-		err := rows.Scan(&p.ID, &p.UserID, &p.Subject, &p.Content)
+		var nullTime sql.NullTime // Used for scanning the 'created_at' column
+		err := rows.Scan(&p.ID, &p.UserID, &p.Subject, &p.Content, &nullTime)
 		if err != nil {
 			return nil, err
 		}
+		// If 'created_at' is not NULL, assign its value to the post 'CreatedAt' field
+		if nullTime.Valid {
+			p.CreatedAt = nullTime.Time
+		}
+		// If 'created_at' is NULL, you can handle it appropriately here.
+		// For this example, I'm going to leave 'CreatedAt' as the zero value of 'time.Time'.
+
+		// Fetch user and add to post
 		user, err := r.store.User().GetByUUID(p.UserID)
 		if err != nil {
 			return nil, err
 		}
 		p.User = user
+
+		// Fetch comments and add to post
+		comments, err := r.store.Comment().GetByPostID(p.ID)
+		if err != nil {
+			return nil, err
+		}
+		p.Comments = comments
+
+		// Add post to posts slice
 		posts = append(posts, &p)
 	}
-
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
@@ -104,4 +122,39 @@ func (r *PostRepository) GetByCategory(categoryID int) ([]*model.Post, error) {
 	}
 
 	return posts, rows.Err()
+}
+
+func (r *CommentRepository) GetByPostID(postID string) ([]*model.Comment, error) {
+	rows, err := r.store.Db.Query(`
+		SELECT id, post_id, user_UUID, content, created_at 
+		FROM comments 
+		WHERE post_id = ?
+	`, postID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	comments := make([]*model.Comment, 0)
+	for rows.Next() {
+		var c model.Comment
+		var nullTime sql.NullTime // Used for scanning the 'created_at' column
+		if err = rows.Scan(&c.ID, &c.PostID, &c.UserID, &c.Content, &nullTime); err != nil {
+			return nil, err
+		}
+
+		// If 'created_at' is not NULL, assign its value to the comment's 'CreatedAt' field
+		if nullTime.Valid {
+			c.CreatedAt = nullTime.Time
+		}
+
+		// Fetch user and add to comment
+		user, err := r.store.User().GetByUUID(c.UserID)
+		if err != nil {
+			return nil, err
+		}
+		c.User = user
+		comments = append(comments, &c)
+	}
+	return comments, nil
 }

@@ -54,10 +54,8 @@
         </div>
     </div>
 </nav>
-
 <main>
     <div class="container">
-        <!-- Inside the posts loop-->
         {{ range .Posts }}
         <div class="card mb-2">
             <div class="card-header">
@@ -67,16 +65,38 @@
             <div class="card-body">
                 <p class="card-text">{{ .Content }}</p>
             </div>
-            <div class="card-footer">
+            <div class="card-footer bg-light">
+                <h6>Categories:</h6>
                 {{ range .Categories }}
                 <span> {{ .Name }} </span>
                 {{ end }}
+            </div>
+
+            <div class="card-body">
+                <h6><i class="bi bi-chat-square-text"></i> Comments:</h6>
+
+                <!-- Display comments for the post -->
+                {{ range .Comments }}
+                <div class="card bg-light mb-3 p-2">
+                    <strong><i class="bi bi-person-circle"></i> {{ .User.UserName }}</strong> commented:
+                    <p class="card-text">{{ .Content }}</p>
+                </div>
+                {{ end }}
+
+                <!-- Comment form -->
+                <form method="post" action="/createComment">
+                    <input type="hidden" name="postID" value="{{ .ID }}" />
+                    <h6><i class="bi bi-pencil"></i> Add your comment:</h6>
+                    <div class="mb-2">
+                        <input type="text" class="form-control" id="commentText" name="commentText">
+                    </div>
+                    <button type="submit" class="btn btn-primary mt-3">Add comment</button>
+                </form>
             </div>
         </div>
         {{ end }}
     </div>
 </main>
-
 <footer class="navbar sticky-bottom bg-body-secondary">
     <div class="container-fluid">
         © 2024

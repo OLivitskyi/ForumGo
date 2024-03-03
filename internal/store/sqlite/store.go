@@ -9,11 +9,12 @@ import (
 
 type Store struct {
 	Db                 *sql.DB
+	Logger             *log.Logger
 	userRepository     *UserRepository
 	postRepository     *PostRepository
 	categoryRepository *CategoryRepository
-	Logger             *log.Logger
 	sessionRepository  *SessionRepository
+	commentRepository  *CommentRepository
 }
 
 func (s *Store) Session() store.SessionRepository {
@@ -52,12 +53,6 @@ func (s *Store) Post() store.PostRepository {
 	return s.postRepository
 }
 
-func NewSQL(db *sql.DB) *Store {
-	return &Store{
-		Db: db,
-	}
-}
-
 func (s *Store) User() store.UserRepository {
 	if s.userRepository != nil {
 		return s.userRepository
@@ -70,10 +65,16 @@ func (s *Store) User() store.UserRepository {
 	return s.userRepository
 }
 
+func NewSQL(db *sql.DB) *Store {
+	return &Store{
+		Db: db,
+	}
+}
+
 func (r *PostRepository) Create(post *model.Post) error {
 	// Insert the post first
-	queryInsert := "INSERT INTO posts(id, user_UUID, subject, content) VALUES(?, ?, ?, ?)"
-	_, err := r.store.Db.Exec(queryInsert, post.ID, post.UserID, post.Subject, post.Content)
+	queryInsert := "INSERT INTO posts(id, user_UUID, subject, content, created_at) VALUES(?, ?, ?, ?, ?)"
+	_, err := r.store.Db.Exec(queryInsert, post.ID, post.UserID, post.Subject, post.Content, post.CreatedAt)
 	if err != nil {
 		return err
 	}
@@ -86,4 +87,13 @@ func (r *PostRepository) Create(post *model.Post) error {
 	}
 
 	return nil
+}
+
+func (s *Store) Comment() store.CommentRepository {
+	if s.commentRepository == nil {
+		s.commentRepository = &CommentRepository{
+			store: s,
+		}
+	}
+	return s.commentRepository
 }
