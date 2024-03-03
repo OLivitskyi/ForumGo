@@ -56,18 +56,18 @@
 </nav>
 <main>
     <div class="container">
-        {{ range .Posts }}
+        {{ range $index, $post := .Posts }}
         <div class="card mb-2">
             <div class="card-header">
-                <h5 class="card-title m-2">{{ .Subject }}</h5>
-                Created by {{ .User.UserName }}
+                <h5 class="card-title m-2">{{ $post.Subject }}</h5>
+                Created by {{ $post.User.UserName }}
             </div>
             <div class="card-body">
-                <p class="card-text">{{ .Content }}</p>
+                <p class="card-text">{{ $post.Content }}</p>
             </div>
             <div class="card-footer bg-light">
                 <h6>Categories:</h6>
-                {{ range .Categories }}
+                {{ range $post.Categories }}
                 <span> {{ .Name }} </span>
                 {{ end }}
             </div>
@@ -76,16 +76,20 @@
                 <h6><i class="bi bi-chat-square-text"></i> Comments:</h6>
 
                 <!-- Display comments for the post -->
-                {{ range .Comments }}
-                <div class="card bg-light mb-3 p-2">
-                    <strong><i class="bi bi-person-circle"></i> {{ .User.UserName }}</strong> commented:
+                {{ range $post.Comments }}
+                <div class="card bg-light m-3 p-2">
+                    <strong><i class="bi bi-person-circle"></i> {{ .User.UserName }}</strong>
                     <p class="card-text">{{ .Content }}</p>
                 </div>
                 {{ end }}
+            </div>
 
-                <!-- Comment form -->
+            <!-- Only show if current user is logged in -->
+            {{ if $.User }}
+            <!-- Comment form -->
+            <div class="card-body">
                 <form method="post" action="/createComment">
-                    <input type="hidden" name="postID" value="{{ .ID }}" />
+                    <input type="hidden" name="postID" value="{{ $post.ID }}" />
                     <h6><i class="bi bi-pencil"></i> Add your comment:</h6>
                     <div class="mb-2">
                         <input type="text" class="form-control" id="commentText" name="commentText">
@@ -93,6 +97,7 @@
                     <button type="submit" class="btn btn-primary mt-3">Add comment</button>
                 </form>
             </div>
+            {{ end }}
         </div>
         {{ end }}
     </div>
