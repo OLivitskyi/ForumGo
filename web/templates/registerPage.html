@@ -23,6 +23,9 @@
             </div>
             <div class="card-body">
                 <form method="post" action="/saveUser">
+                    {{ if .ErrorMsg }}
+                    <div class="alert alert-danger">{{ .ErrorMsg }}</div>
+                    {{ end }}
                     <div class="mb-2">
                         <label for="email" class="form-label">Enter Your Email</label>
                         <input type="email" class="form-control" id="email" name="email">
@@ -41,14 +44,13 @@
                     </div>
                     <button type="submit" class="btn btn-primary mt-3">Register</button>
                 </form>
-                
             </div>
         </div>
     </div>
 </main>
 <footer class="navbar sticky-bottom bg-body-secondary">
     <div class="container-fluid">
-        © 2024 Evgeny, Mati, Jegor, Peep
+        © 2024
     </div>
 </footer>
 <script src="/static/bootstrap.js"></script>

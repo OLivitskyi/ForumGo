@@ -38,6 +38,19 @@ func (s *server) saveRegister() http.HandlerFunc {
 		userName := r.FormValue("userName")
 		email := r.FormValue("email")
 		password := r.FormValue("password")
+		rePassword := r.FormValue("rePassword")
+
+		// Check if passwords match
+		if password != rePassword {
+			s.logger.Println("Passwords don't match")
+			data := struct {
+				ErrorMsg string
+			}{
+				ErrorMsg: "Passwords don't match",
+			}
+			execTmpl(w, templates.Lookup("registerPage.html"), data)
+			return
+		}
 
 		err := s.store.User().ExistingUser(userName, email)
 		if err != nil {
@@ -60,7 +73,6 @@ func (s *server) saveRegister() http.HandlerFunc {
 		}
 
 		execTmpl(w, templates.Lookup("main.html"), nil)
-
 	}
 }
 
