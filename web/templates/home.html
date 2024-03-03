@@ -41,7 +41,6 @@
                         <a href="/logout" class="nav-link">Logout ({{.User.UserName}})</a>
                         {{else}}
                         <a href="/loginPage" class="nav-link">Login</a>
-                        <a href="/registerPage" class="nav-link">Register</a>
                         {{end}}
                     </li>
                     <li class="nav-item">
@@ -63,15 +62,15 @@
         <div class="card mb-2">
             <div class="card-header">
                 <h5 class="card-title m-2">{{ .Subject }}</h5>
+                Created by {{ .User.UserName }}
             </div>
             <div class="card-body">
                 <p class="card-text">{{ .Content }}</p>
-
-                <!-- Display categories of the post -->
+            </div>
+            <div class="card-footer">
                 {{ range .Categories }}
-                <p class="category-text">{{ .Name }}</p>
+                <span> {{ .Name }} </span>
                 {{ end }}
-
             </div>
         </div>
         {{ end }}

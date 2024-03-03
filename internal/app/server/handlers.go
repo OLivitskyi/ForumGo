@@ -145,6 +145,9 @@ func (s *server) home() http.HandlerFunc {
 
 		// Fetching categories for each post.
 		for _, post := range posts {
+			fetchedUser, _ := s.store.User().GetByUUID(post.UserID) // fetch user who created the post
+			post.User = fetchedUser
+
 			categories, err := s.store.Post().GetCategories(post.ID)
 			if err != nil {
 				s.logger.Println("error fetching categories for post:", err)

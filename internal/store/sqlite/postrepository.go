@@ -29,6 +29,11 @@ func (r *PostRepository) GetAll() ([]*model.Post, error) {
 		if err != nil {
 			return nil, err
 		}
+		user, err := r.store.User().GetByUUID(p.UserID)
+		if err != nil {
+			return nil, err
+		}
+		p.User = user
 		posts = append(posts, &p)
 	}
 
@@ -84,7 +89,11 @@ func (r *PostRepository) GetByCategory(categoryID int) ([]*model.Post, error) {
 		if err != nil {
 			return nil, err
 		}
-
+		user, err := r.store.User().GetByUUID(post.UserID)
+		if err != nil {
+			return nil, err
+		}
+		post.User = user
 		categories, err := r.GetCategories(post.ID)
 		if err != nil {
 			return nil, err

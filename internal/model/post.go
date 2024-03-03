@@ -8,6 +8,7 @@ type Post struct {
 	Subject    string      `json:"subject"`
 	Content    string      `json:"content"`
 	Categories []*Category `json:"categories"` // Updated to []*Category
+	User       *User
 }
 
 func NewPost(userID, subject, content string) (*Post, error) {
