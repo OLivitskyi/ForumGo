@@ -199,11 +199,27 @@ func (s *server) createPostPage() http.HandlerFunc {
 
 func (s *server) createPost() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		userID := "Admin"
+		// Get session cookie
+		sessionCookie, err := r.Cookie("session_uuid")
+		if err != nil {
+			http.Redirect(w, r, "/loginPage", http.StatusSeeOther)
+			return
+		}
+
+		// Fetch the session
+		session, err := s.store.Session().GetByUUID(sessionCookie.Value)
+		if err != nil {
+			http.Redirect(w, r, "/loginPage", http.StatusSeeOther)
+			return
+		}
+
+		// Get the user UUID from session
+		userUUID := session.UserUUID
+
 		subject := r.FormValue("postTitle")
 		content := r.FormValue("postText")
 
-		post, err := model.NewPost(userID, subject, content)
+		post, err := model.NewPost(userUUID, subject, content)
 		if err != nil {
 			s.logger.Println("NewPost() error: ", err)
 			http.Redirect(w, r, "/createPostPage", http.StatusSeeOther)
@@ -262,6 +278,15 @@ func (s *server) createCategory() http.HandlerFunc {
 
 func (s *server) categoryPosts() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		// Get current user if exists
+		var user *model.User
+		if sessionCookie, err := r.Cookie("session_uuid"); err == nil {
+			session, err := s.store.Session().GetByUUID(sessionCookie.Value)
+			if err == nil {
+				user, _ = s.store.User().GetByUUID(session.UserUUID)
+			}
+		}
+
 		// Pull out the categoryID from the url.
 		s.logger.Println("Path:", r.URL.Path)
 
@@ -300,10 +325,8 @@ func (s *server) categoryPosts() http.HandlerFunc {
 			s.logger.Println("Category name:", category.Name)
 		}
 
-		data := struct {
-			Posts      []*model.Post
-			Categories []*model.Category
-		}{
+		data := &model.PageData{
+			User:       user,
 			Posts:      posts,
 			Categories: allCategories,
 		}
