@@ -23,6 +23,8 @@ func (s *server) HandlePaths() {
 	s.router.HandleFunc("/createCategory", s.createCategory())
 	s.router.HandleFunc("/createCategoryPage", s.createCategoryPage())
 	s.router.HandleFunc("/category/", s.categoryPosts())
+	s.router.HandleFunc("/userProfilePage", s.serveUserProfile())
+	s.router.HandleFunc("/logout", s.logout())
 }
 
 func (s *server) registerPage() http.HandlerFunc {
@@ -75,21 +77,45 @@ func (s *server) login() http.HandlerFunc {
 		password := r.FormValue("password")
 		s.logger.Println(email, password)
 
-		// Create a new User instance with only email and password
 		user := &model.User{
 			Email:    email,
 			Password: password,
 		}
 
+		// Authenticate the user
 		if err := s.store.User().Login(user); err != nil {
 			s.logger.Println("redirect - Login() error: ", err)
 			http.Redirect(w, r, "/loginPage", http.StatusBadRequest)
 			return
 		}
 
-		//	execTmpl(w, templates.Lookup("login.html"), nil)
-	}
+		// Create a new session for the user
+		session, err := model.NewSession(user.UUID)
+		if err != nil {
+			s.logger.Println("NewSession() error: ", err)
+			http.Redirect(w, r, "/loginPage", http.StatusInternalServerError)
+			return
+		}
 
+		// Store the session in the database
+		if err := s.store.Session().Create(session); err != nil {
+			s.logger.Println("CreateSession() error: ", err)
+			http.Redirect(w, r, "/loginPage", http.StatusInternalServerError)
+			return
+		}
+
+		// Set a session cookie
+		http.SetCookie(w, &http.Cookie{
+			Name:     "session_uuid",
+			Value:    session.SessionID,
+			Expires:  session.ExpiresAt,
+			HttpOnly: true,
+			Secure:   false, // Set to true if you have HTTPS
+		})
+
+		// Redirect the user to their profile
+		http.Redirect(w, r, "/userProfilePage", http.StatusSeeOther)
+	}
 }
 
 func (s *server) serveStatic() http.HandlerFunc {
@@ -100,6 +126,15 @@ func (s *server) serveStatic() http.HandlerFunc {
 
 func (s *server) home() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		// Get current user if exists
+		var user *model.User
+		if sessionCookie, err := r.Cookie("session_uuid"); err == nil {
+			session, err := s.store.Session().GetByUUID(sessionCookie.Value)
+			if err == nil {
+				user, _ = s.store.User().GetByUUID(session.UserUUID)
+			}
+		}
+
 		// Fetching all posts.
 		posts, err := s.store.Post().GetAll()
 		if err != nil {
@@ -128,10 +163,8 @@ func (s *server) home() http.HandlerFunc {
 		}
 
 		// Struct to pass into template.
-		data := struct {
-			Posts      []*model.Post
-			Categories []*model.Category
-		}{
+		data := &model.PageData{
+			User:       user,
 			Posts:      posts,
 			Categories: allCategories,
 		}
@@ -276,5 +309,95 @@ func (s *server) categoryPosts() http.HandlerFunc {
 		}
 
 		execTmpl(w, templates.Lookup("home.html"), data)
+	}
+}
+
+func (s *server) registerHandler() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		// Get the user info from the form and create a new User
+		userName := r.FormValue("username")
+		password := r.FormValue("password")
+		email := r.FormValue("email")
+
+		user, err := model.NewUser(userName, email, password)
+		if err != nil {
+			http.Error(w, "couldn't create the user", http.StatusInternalServerError)
+			return
+		}
+
+		if err := s.store.User().Register(user); err != nil {
+			http.Error(w, "failed to register the user", http.StatusInternalServerError)
+			return
+		}
+
+		// Create a new session for the user
+		session, err := model.NewSession(user.UUID)
+		if err != nil {
+			http.Error(w, "failed to create session", http.StatusInternalServerError)
+			return
+		}
+		if err := s.store.Session().Create(session); err != nil {
+			http.Error(w, "failed to store session", http.StatusInternalServerError)
+			return
+		}
+
+		// Set a cookie for the session
+		cookie := &http.Cookie{Name: "session_uuid", Value: session.SessionID,
+			Expires: session.ExpiresAt, HttpOnly: true}
+		http.SetCookie(w, cookie)
+
+		// Redirect the user to the their profile
+		http.Redirect(w, r, "/userProfilePage", http.StatusSeeOther) // assuming that "/userProfilePage" exists
+	}
+}
+
+func (s *server) serveUserProfile() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		// Extract session cookie
+		sessionCookie, err := r.Cookie("session_uuid")
+		if err != nil {
+			http.Redirect(w, r, "/loginPage", http.StatusSeeOther)
+			return
+		}
+
+		// Fetch the session
+		session, err := s.store.Session().GetByUUID(sessionCookie.Value)
+		if err != nil {
+			http.Redirect(w, r, "/loginPage", http.StatusSeeOther)
+			return
+		}
+
+		// Fetch the user
+		user, err := s.store.User().GetByUUID(session.UserUUID)
+		if err != nil {
+			http.Redirect(w, r, "/loginPage", http.StatusSeeOther)
+			return
+		}
+
+		// Render template with user data
+		execTmpl(w, templates.Lookup("userProfilePage.html"), user)
+	}
+}
+
+func (s *server) logout() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		session, err := r.Cookie("session_uuid")
+		if err != nil {
+			http.Redirect(w, r, "/loginPage", http.StatusSeeOther)
+			return
+		}
+
+		// Delete the session from the DB
+		err = s.store.Session().Delete(session.Value)
+		if err != nil {
+			http.Error(w, "Failed to end session", http.StatusInternalServerError)
+			return
+		}
+
+		// Delete the session cookie
+		session.MaxAge = -1
+		http.SetCookie(w, session)
+
+		http.Redirect(w, r, "/", http.StatusSeeOther)
 	}
 }

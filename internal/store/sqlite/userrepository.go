@@ -57,3 +57,16 @@ func (r *UserRepository) Register(user *model.User) error {
 	}
 	return nil
 }
+
+// Gets a user by UUID
+func (r *UserRepository) GetByUUID(uuid string) (*model.User, error) {
+	var u model.User
+	if err := r.store.Db.QueryRow(
+		"SELECT UUID, username, email, password FROM users WHERE UUID = ?",
+		uuid,
+	).Scan(&u.UUID, &u.UserName, &u.Email, &u.Password); err != nil {
+		return nil, err
+	}
+
+	return &u, nil
+}

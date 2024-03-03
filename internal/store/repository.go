@@ -6,6 +6,7 @@ type UserRepository interface {
 	ExistingUser(userName, email string) error
 	Login(user *model.User) error
 	Register(user *model.User) error
+	GetByUUID(uuid string) (*model.User, error)
 }
 
 type PostRepository interface {

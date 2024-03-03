@@ -13,6 +13,19 @@ type Store struct {
 	postRepository     *PostRepository
 	categoryRepository *CategoryRepository
 	Logger             *log.Logger
+	sessionRepository  *SessionRepository
+}
+
+func (s *Store) Session() store.SessionRepository {
+	if s.sessionRepository != nil {
+		return s.sessionRepository
+	}
+
+	s.sessionRepository = &SessionRepository{
+		store: s,
+	}
+
+	return s.sessionRepository
 }
 
 func (s *Store) Category() store.CategoryRepository {

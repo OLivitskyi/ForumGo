@@ -37,7 +37,17 @@
                         <a href="/createCategoryPage" class="nav-link">Create a Category</a>
                     </li>
                     <li class="nav-item">
-                        <a href="loginPage" class="nav-link">Login</a>
+                        {{if .User}}
+                        <a href="/logout" class="nav-link">Logout ({{.User.UserName}})</a>
+                        {{else}}
+                        <a href="/loginPage" class="nav-link">Login</a>
+                        {{end}}
+                    </li>
+                    <li class="nav-item">
+                        {{if .User}}
+                        {{else}}
+                        <a href="/registerPage" class="nav-link">Register</a>
+                        {{end}}
                     </li>
                     <li class="nav-item">
                         <a href="/registerPage" class="nav-link">Register</a>
