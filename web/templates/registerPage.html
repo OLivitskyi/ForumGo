@@ -23,24 +23,30 @@
             </div>
             <div class="card-body">
                 <form method="post" action="/saveUser">
+                    {{if .UserExistsErrorMsg}}
+                    <div class="alert alert-danger">{{ .UserExistsErrorMsg }}</div>
+                    {{end}}
+                    {{if .RegisterError}}
+                    <div class="alert alert-danger">{{ .RegisterError }}</div>
+                    {{end}}
                     {{ if .ErrorMsg }}
                     <div class="alert alert-danger">{{ .ErrorMsg }}</div>
                     {{ end }}
                     <div class="mb-2">
                         <label for="email" class="form-label">Enter Your Email</label>
-                        <input type="email" class="form-control" id="email" name="email">
+                        <input type="email" class="form-control" id="email" name="email" required>
                     </div>
                     <div class="mb-2">
                         <label for="userName" class="form-label">Choose Your Username</label>
-                        <input type="text" class="form-control" id="userName" name="userName">
+                        <input type="text" class="form-control" id="userName" name="userName" required>
                     </div>
                     <div class="mb-2">
                         <label for="password" class="form-label">Choose Your Password</label>
-                        <input type="password" class="form-control" id="password" name="password">
+                        <input type="password" class="form-control" id="password" name="password" required>
                     </div>
                     <div class="mb-2">
                         <label for="rePassword" class="form-label">Reenter the Password</label>
-                        <input type="password" class="form-control" id="rePassword" name="rePassword">
+                        <input type="password" class="form-control" id="rePassword" name="rePassword" required>
                     </div>
                     <button type="submit" class="btn btn-primary mt-3">Register</button>
                 </form>

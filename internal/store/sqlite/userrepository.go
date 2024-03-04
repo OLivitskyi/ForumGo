@@ -3,6 +3,7 @@ package sqlite
 import (
 	"Forum/internal/model"
 	"errors"
+	"fmt"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -14,7 +15,7 @@ func (r *UserRepository) ExistingUser(userName, email string) error {
 	queryEmail := "SELECT * FROM users WHERE email = ?"
 	rows, err := r.store.Db.Query(queryEmail, email)
 	if err != nil {
-		return errors.Join(errors.New("email check failed"), err)
+		return fmt.Errorf("email check failed: %v", err)
 	}
 	defer rows.Close()
 
@@ -25,7 +26,7 @@ func (r *UserRepository) ExistingUser(userName, email string) error {
 	queryName := "SELECT * FROM users WHERE username = ?"
 	rows, err = r.store.Db.Query(queryName, userName)
 	if err != nil {
-		return errors.Join(errors.New("user name check failed"), err)
+		return fmt.Errorf("user name check failed: %v", err)
 	}
 	defer rows.Close()
 

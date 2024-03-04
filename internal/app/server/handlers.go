@@ -36,6 +36,8 @@ func (s *server) registerPage() http.HandlerFunc {
 
 func (s *server) saveRegister() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		data := model.RegisterPageData{}
+
 		userName := r.FormValue("userName")
 		email := r.FormValue("email")
 		password := r.FormValue("password")
@@ -44,39 +46,37 @@ func (s *server) saveRegister() http.HandlerFunc {
 		// Check if passwords match
 		if password != rePassword {
 			s.logger.Println("Passwords don't match")
-			data := struct {
-				ErrorMsg string
-			}{
-				ErrorMsg: "Passwords don't match",
-			}
+			data.ErrorMsg = "Passwords don't match"
 			execTmpl(w, templates.Lookup("registerPage.html"), data)
 			return
 		}
 
 		err := s.store.User().ExistingUser(userName, email)
 		if err != nil {
-			http.Redirect(w, r, "/registerPage", http.StatusSeeOther)
-			s.logger.Println("redirect - error:", err)
+			s.logger.Println("error:", err)
+			data.UserExistsErrorMsg = "User already exists in the system"
+			execTmpl(w, templates.Lookup("registerPage.html"), data)
 			return
 		}
 
 		user, err := model.NewUser(userName, email, password)
 		if err != nil {
 			s.logger.Println("NewUser() error: ", err)
-			http.Redirect(w, r, "/registerPage", http.StatusSeeOther)
+			data.ErrorMsg = "Failed to create the user"
+			execTmpl(w, templates.Lookup("registerPage.html"), data)
 			return
 		}
 
 		if err = s.store.User().Register(user); err != nil {
 			s.logger.Println("Register() error: ", err)
-			http.Redirect(w, r, "/registerPage", http.StatusSeeOther)
+			data.ErrorMsg = "Failed to register the user"
+			execTmpl(w, templates.Lookup("registerPage.html"), data)
 			return
 		}
 
 		execTmpl(w, templates.Lookup("main.html"), nil)
 	}
 }
-
 func (s *server) loginPage() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		execTmpl(w, templates.Lookup("login.html"), nil)
@@ -371,19 +371,42 @@ func (s *server) categoryPosts() http.HandlerFunc {
 
 func (s *server) registerHandler() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		// Get the user info from the form and create a new User
 		userName := r.FormValue("username")
 		password := r.FormValue("password")
 		email := r.FormValue("email")
 
-		user, err := model.NewUser(userName, email, password)
-		if err != nil {
-			http.Error(w, "couldn't create the user", http.StatusInternalServerError)
+		if userName == "" || password == "" || email == "" {
+			data := struct {
+				ErrorMsg string
+			}{
+				ErrorMsg: "All fields must be provided",
+			}
+			execTmpl(w, templates.Lookup("/registerPage.html"), data)
 			return
 		}
 
-		if err := s.store.User().Register(user); err != nil {
-			http.Error(w, "failed to register the user", http.StatusInternalServerError)
+		err := s.store.User().ExistingUser(userName, email)
+		if err != nil {
+			s.logger.Println("redirect - error:", err)
+			data := struct {
+				UserExistsErrorMsg string
+			}{
+				UserExistsErrorMsg: "User already exists in the system",
+			}
+			execTmpl(w, templates.Lookup("/registerPage.html"), data)
+			return
+		}
+
+		user, err := model.NewUser(userName, email, password)
+		if err != nil {
+			s.logger.Println("NewUser() error: ", err)
+			http.Redirect(w, r, "/registerPage", http.StatusSeeOther)
+			return
+		}
+
+		if err = s.store.User().Register(user); err != nil {
+			s.logger.Println("Register() error: ", err)
+			http.Redirect(w, r, "/registerPage", http.StatusSeeOther)
 			return
 		}
 
@@ -404,7 +427,7 @@ func (s *server) registerHandler() http.HandlerFunc {
 		http.SetCookie(w, cookie)
 
 		// Redirect the user to the their profile
-		http.Redirect(w, r, "/userProfilePage", http.StatusSeeOther) // assuming that "/userProfilePage" exists
+		http.Redirect(w, r, "/home", http.StatusSeeOther)
 	}
 }
 
