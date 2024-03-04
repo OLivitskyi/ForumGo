@@ -127,7 +127,7 @@ func (s *server) login() http.HandlerFunc {
 		})
 
 		// Redirect the user to their profile
-		http.Redirect(w, r, "/userProfilePage", http.StatusSeeOther)
+		http.Redirect(w, r, "/home", http.StatusSeeOther)
 	}
 }
 
@@ -303,20 +303,13 @@ func (s *server) categoryPosts() http.HandlerFunc {
 			}
 		}
 
-		// Pull out the categoryID from the url.
-		s.logger.Println("Path:", r.URL.Path)
-
 		categoryIDStr := strings.TrimPrefix(r.URL.Path, "/category/")
-		s.logger.Println("Parsed CategoryIDStr:", categoryIDStr)
-
 		categoryID, err := strconv.Atoi(categoryIDStr)
 		if err != nil {
 			s.logger.Println("Error converting category ID:", err)
 			http.Error(w, "Invalid category ID", http.StatusBadRequest)
 			return
 		}
-
-		s.logger.Println("Using CategoryID:", categoryID)
 
 		// Get all posts in the category.
 		posts, err := s.store.Post().GetByCategory(categoryID)
@@ -327,9 +320,37 @@ func (s *server) categoryPosts() http.HandlerFunc {
 		}
 
 		for _, post := range posts {
-			s.logger.Println("Post subject:", post.Subject)
+			// Fetch user who created the post
+			fetchedUser, _ := s.store.User().GetByUUID(post.UserID)
+			post.User = fetchedUser
+
+			// Fetch categories for each post
+			categories, err := s.store.Post().GetCategories(post.ID)
+			if err != nil {
+				s.logger.Println("error fetching categories for post:", err)
+				http.Error(w, "error fetching post categories", http.StatusInternalServerError)
+				return
+			}
+			post.Categories = categories
+
+			// Fetch comments for each post
+			comments, err := s.store.Comment().GetByPostID(post.ID)
+			if err != nil {
+				s.logger.Println("error fetching comments for post:", err)
+				http.Error(w, "error fetching post comments", http.StatusInternalServerError)
+				return
+			}
+
+			for _, comment := range comments {
+				// Fetch user who created the comment
+				fetchedUser, _ := s.store.User().GetByUUID(comment.UserID)
+				comment.User = fetchedUser
+			}
+
+			post.Comments = comments // Attach comments to post
 		}
 
+		// Fetch all categories except currently used
 		allCategories, err := s.store.Category().GetAll()
 		if err != nil {
 			s.logger.Println("Error fetching categories:", err)
@@ -337,10 +358,7 @@ func (s *server) categoryPosts() http.HandlerFunc {
 			return
 		}
 
-		for _, category := range allCategories {
-			s.logger.Println("Category name:", category.Name)
-		}
-
+		// Pass data to template
 		data := &model.PageData{
 			User:       user,
 			Posts:      posts,

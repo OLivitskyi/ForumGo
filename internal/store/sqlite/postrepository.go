@@ -112,11 +112,19 @@ func (r *PostRepository) GetByCategory(categoryID int) ([]*model.Post, error) {
 			return nil, err
 		}
 		post.User = user
+
 		categories, err := r.GetCategories(post.ID)
 		if err != nil {
 			return nil, err
 		}
 		post.Categories = categories
+
+		// Fetch comments and add to post
+		comments, err := r.store.Comment().GetByPostID(post.ID)
+		if err != nil {
+			return nil, err
+		}
+		post.Comments = comments
 
 		posts = append(posts, &post)
 	}
@@ -127,7 +135,7 @@ func (r *PostRepository) GetByCategory(categoryID int) ([]*model.Post, error) {
 func (r *CommentRepository) GetByPostID(postID string) ([]*model.Comment, error) {
 	rows, err := r.store.Db.Query(`
 		SELECT id, post_id, user_UUID, content, created_at 
-		FROM comments 
+		FROM comments
 		WHERE post_id = ?
 	`, postID)
 	if err != nil {
@@ -138,23 +146,27 @@ func (r *CommentRepository) GetByPostID(postID string) ([]*model.Comment, error)
 	comments := make([]*model.Comment, 0)
 	for rows.Next() {
 		var c model.Comment
-		var nullTime sql.NullTime // Used for scanning the 'created_at' column
-		if err = rows.Scan(&c.ID, &c.PostID, &c.UserID, &c.Content, &nullTime); err != nil {
+		var nullTime sql.NullTime
+		if err := rows.Scan(&c.ID, &c.PostID, &c.UserID, &c.Content, &nullTime); err != nil {
 			return nil, err
 		}
 
-		// If 'created_at' is not NULL, assign its value to the comment's 'CreatedAt' field
+		// If 'created_at' is not NULL, assign its value to the comment 'CreatedAt' field
 		if nullTime.Valid {
 			c.CreatedAt = nullTime.Time
 		}
 
-		// Fetch user and add to comment
+		// Fetch user who created the comment
 		user, err := r.store.User().GetByUUID(c.UserID)
 		if err != nil {
 			return nil, err
 		}
 		c.User = user
+
 		comments = append(comments, &c)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
 	}
 	return comments, nil
 }
