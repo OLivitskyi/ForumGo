@@ -8,6 +8,7 @@ type Store interface {
 	Category() CategoryRepository
 	Session() SessionRepository
 	Comment() CommentRepository
+	Reaction() ReactionRepository
 }
 type CategoryRepository interface {
 	Create(cate *model.Category) error

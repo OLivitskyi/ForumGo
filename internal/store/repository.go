@@ -20,3 +20,10 @@ type CommentRepository interface {
 	Create(c *model.Comment) error
 	GetByPostID(postID string) ([]*model.Comment, error)
 }
+
+type ReactionRepository interface {
+	CreateReaction(reaction *model.Reaction) error
+	DeleteReaction(userID, postID string) error
+	GetUserReaction(userID, postID string) (*model.Reaction, error)
+	CountReactions(postID string) (int, error)
+}

@@ -26,6 +26,7 @@ func (s *server) HandlePaths() {
 	s.router.HandleFunc("/userProfilePage", s.serveUserProfile())
 	s.router.HandleFunc("/logout", s.logout())
 	s.router.HandleFunc("/createComment", s.createComment())
+	s.router.HandleFunc("/createPostReaction", s.handleCreatePostReaction())
 }
 
 func (s *server) registerPage() http.HandlerFunc {
@@ -524,5 +525,42 @@ func (s *server) createComment() http.HandlerFunc {
 
 		// Redirect back to homepage
 		http.Redirect(w, r, "/", http.StatusSeeOther)
+	}
+}
+func (s *server) handleCreatePostReaction() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		// Parse form values
+		r.ParseForm()
+		userUUID := r.FormValue("userUUID")
+		postID := r.FormValue("postID")
+		reactionTypeStr := r.FormValue("reactionType")
+
+		// Convert reactionType to model.ReactionType
+		var reactionType model.ReactionType
+		switch reactionTypeStr {
+		case "like":
+			reactionType = model.Like
+		case "dislike":
+			reactionType = model.Dislike
+		default:
+			http.Error(w, "Invalid reaction type", http.StatusBadRequest)
+			return
+		}
+
+		// Construct reaction
+		reaction := &model.Reaction{
+			UserID: userUUID,
+			PostID: postID,
+			Type:   reactionType,
+		}
+
+		// Save reaction in the database
+		if err := s.store.Reaction().CreateReaction(reaction); err != nil {
+			http.Error(w, "Failed to save reaction", http.StatusInternalServerError)
+			return
+		}
+
+		// Redirect back to post
+		http.Redirect(w, r, "/postPage?postID="+postID, http.StatusSeeOther)
 	}
 }
