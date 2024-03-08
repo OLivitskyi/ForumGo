@@ -158,9 +158,39 @@ func (s *server) home() http.HandlerFunc {
 			return
 		}
 
-		// Fetching categories for each post.
+		// Fetching categories and comments for each post.
 		for _, post := range posts {
 			fetchedUser, _ := s.store.User().GetByUUID(post.UserID) // fetch user who created the post
+			post.User = fetchedUser
+
+			categories, err := s.store.Post().GetCategories(post.ID)
+			if err != nil {
+				s.logger.Println("error fetching categories for post:", err)
+				http.Error(w, "error fetching post categories", http.StatusInternalServerError)
+				return
+			}
+			post.Categories = categories
+
+			// Fetch comments for each post
+			comments, err := s.store.Comment().GetByPostID(post.ID)
+			if err != nil {
+				s.logger.Println("error fetching comments for post:", err)
+				http.Error(w, "error fetching post comments", http.StatusInternalServerError)
+				return
+			}
+
+			for _, comment := range comments {
+				// Fetch user who created the comment
+				fetchedUser, _ := s.store.User().GetByUUID(comment.UserID)
+				comment.User = fetchedUser
+			}
+
+			post.Comments = comments
+		}
+
+		// Fetching categories for each post.
+		for _, post := range posts {
+			fetchedUser, _ := s.store.User().GetByUUID(post.UserID)
 			post.User = fetchedUser
 
 			categories, err := s.store.Post().GetCategories(post.ID)
