@@ -22,8 +22,14 @@ type CommentRepository interface {
 }
 
 type ReactionRepository interface {
-	CreateReaction(reaction *model.Reaction) error
-	DeleteReaction(userID, postID string) error
-	GetUserReaction(userID, postID string) (*model.Reaction, error)
-	CountReactions(postID string) (int, error)
+	CreatePostReaction(reaction *model.Reaction) error
+	DeletePostReaction(userID, postID string) error
+	GetUserPostReaction(userID, postID string) (*model.Reaction, error)
+	CountPostReactions(postID string) (int, error)
+	UpdatePostReaction(userID, postID string, reactionID int) error
+
+	CreateCommentReaction(reaction *model.Reaction) error
+	DeleteCommentReaction(userID, commentID string) error
+	GetUserCommentReaction(userID, commentID string) (*model.Reaction, error)
+	CountCommentReactions(commentID string) (int, error)
 }

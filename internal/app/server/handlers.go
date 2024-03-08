@@ -2,6 +2,7 @@ package server
 
 import (
 	"Forum/internal/model"
+	"database/sql"
 	"html/template"
 	"log"
 	"net/http"
@@ -527,40 +528,82 @@ func (s *server) createComment() http.HandlerFunc {
 		http.Redirect(w, r, "/", http.StatusSeeOther)
 	}
 }
+
 func (s *server) handleCreatePostReaction() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		// Parse form values
-		r.ParseForm()
-		userUUID := r.FormValue("userUUID")
+		if err := r.ParseForm(); err != nil {
+			http.Error(w, "Error parsing form", http.StatusBadRequest)
+			return
+		}
+		sessionCookie, err := r.Cookie("session_uuid")
+		if err != nil {
+			http.Error(w, "Session error", http.StatusBadRequest)
+			return
+		}
+		session, err := s.store.Session().GetByUUID(sessionCookie.Value)
+		if err != nil {
+			http.Error(w, "Session retrieval error", http.StatusInternalServerError)
+			return
+		}
+		userUUID := session.UserUUID
 		postID := r.FormValue("postID")
 		reactionTypeStr := r.FormValue("reactionType")
 
-		// Convert reactionType to model.ReactionType
-		var reactionType model.ReactionType
+		var reactionID int
 		switch reactionTypeStr {
 		case "like":
-			reactionType = model.Like
+			reactionID = 1
 		case "dislike":
-			reactionType = model.Dislike
+			reactionID = 2
 		default:
 			http.Error(w, "Invalid reaction type", http.StatusBadRequest)
 			return
 		}
 
-		// Construct reaction
-		reaction := &model.Reaction{
-			UserID: userUUID,
-			PostID: postID,
-			Type:   reactionType,
-		}
-
-		// Save reaction in the database
-		if err := s.store.Reaction().CreateReaction(reaction); err != nil {
-			http.Error(w, "Failed to save reaction", http.StatusInternalServerError)
+		existingReaction, err := s.store.Reaction().GetUserPostReaction(userUUID, postID)
+		if err != nil && err != sql.ErrNoRows {
+			http.Error(w, "Database error", http.StatusInternalServerError)
 			return
 		}
 
-		// Redirect back to post
-		http.Redirect(w, r, "/postPage?postID="+postID, http.StatusSeeOther)
+		if existingReaction != nil {
+			// Якщо користувач повторює ту саму реакцію, видаляємо існуючу
+			if existingReaction.ReactionID == reactionID {
+				if err := s.store.Reaction().DeletePostReaction(userUUID, postID); err != nil {
+					http.Error(w, "Failed to delete reaction", http.StatusInternalServerError)
+					return
+				}
+			} else {
+				// Якщо користувач змінив тип реакції, видаляємо стару та створюємо нову
+				if err := s.store.Reaction().DeletePostReaction(userUUID, postID); err != nil {
+					http.Error(w, "Failed to delete existing reaction", http.StatusInternalServerError)
+					return
+				}
+
+				// Створення нової реакції після видалення старої
+				reaction := &model.Reaction{
+					UserID:     userUUID,
+					PostID:     postID,
+					ReactionID: reactionID,
+				}
+				if err := s.store.Reaction().CreatePostReaction(reaction); err != nil {
+					http.Error(w, "Failed to create reaction", http.StatusInternalServerError)
+					return
+				}
+			}
+		} else {
+			// Якщо реакції на пост від користувача не було, створюємо нову
+			reaction := &model.Reaction{
+				UserID:     userUUID,
+				PostID:     postID,
+				ReactionID: reactionID,
+			}
+			if err := s.store.Reaction().CreatePostReaction(reaction); err != nil {
+				http.Error(w, "Failed to create reaction", http.StatusInternalServerError)
+				return
+			}
+		}
+
+		http.Redirect(w, r, "/home?postID="+postID, http.StatusSeeOther)
 	}
 }

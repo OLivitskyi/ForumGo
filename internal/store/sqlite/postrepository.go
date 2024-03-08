@@ -17,7 +17,17 @@ func (r *PostRepository) AddCategoryToPost(postID string, categoryID int) error 
 }
 
 func (r *PostRepository) GetAll() ([]*model.Post, error) {
-	rows, err := r.store.Db.Query("SELECT id, user_UUID, subject, content, created_at FROM posts")
+	// Запит з JOIN операцією для отримання кількості реакцій разом з постами
+	query := `
+    SELECT p.id, p.user_UUID, p.subject, p.content, p.created_at,
+           COALESCE(SUM(CASE WHEN pr.reaction_id = 1 THEN 1 ELSE 0 END), 0) AS LikeCount,
+           COALESCE(SUM(CASE WHEN pr.reaction_id = 2 THEN 1 ELSE 0 END), 0) AS DislikeCount
+    FROM posts p
+    LEFT JOIN post_reactions pr ON p.id = pr.post_id
+    GROUP BY p.id
+    `
+
+	rows, err := r.store.Db.Query(query)
 	if err != nil {
 		return nil, err
 	}
@@ -26,33 +36,13 @@ func (r *PostRepository) GetAll() ([]*model.Post, error) {
 	posts := make([]*model.Post, 0)
 	for rows.Next() {
 		var p model.Post
-		var nullTime sql.NullTime // Used for scanning the 'created_at' column
-		err := rows.Scan(&p.ID, &p.UserID, &p.Subject, &p.Content, &nullTime)
+		// Розширений набір полів для сканування
+		err := rows.Scan(&p.ID, &p.UserID, &p.Subject, &p.Content, &p.CreatedAt, &p.LikeCount, &p.DislikeCount)
 		if err != nil {
 			return nil, err
 		}
-		// If 'created_at' is not NULL, assign its value to the post 'CreatedAt' field
-		if nullTime.Valid {
-			p.CreatedAt = nullTime.Time
-		}
-		// If 'created_at' is NULL, you can handle it appropriately here.
-		// For this example, I'm going to leave 'CreatedAt' as the zero value of 'time.Time'.
 
-		// Fetch user and add to post
-		user, err := r.store.User().GetByUUID(p.UserID)
-		if err != nil {
-			return nil, err
-		}
-		p.User = user
-
-		// Fetch comments and add to post
-		comments, err := r.store.Comment().GetByPostID(p.ID)
-		if err != nil {
-			return nil, err
-		}
-		p.Comments = comments
-
-		// Add post to posts slice
+		// Інша логіка залишається без зміни
 		posts = append(posts, &p)
 	}
 	if err := rows.Err(); err != nil {

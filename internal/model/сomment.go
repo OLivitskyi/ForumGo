@@ -6,12 +6,14 @@ import (
 )
 
 type Comment struct {
-	ID        string
-	PostID    string
-	UserID    string
-	User      *User
-	Content   string
-	CreatedAt time.Time
+	ID           string
+	PostID       string
+	UserID       string
+	User         *User
+	Content      string
+	CreatedAt    time.Time
+	LikeCount    int
+	DislikeCount int
 }
 
 func NewComment(postID, userUUID, content string) (*Comment, error) {
