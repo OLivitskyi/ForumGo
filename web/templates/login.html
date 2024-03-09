@@ -23,6 +23,11 @@
                     <h5 class="card-title m-2">Login</h5>
                 </div>
                 <div class="card-body">
+                    {{if .ErrorMessage}}
+                    <div class="alert alert-danger" role="alert">
+                        {{ .ErrorMessage }}
+                    </div>
+                    {{end}}
                     <div class="mb-2">
                         <label for="email" class="form-label">Email</label>
                         <input type="email" class="form-control" id="email" name="email" placeholder="email" required>

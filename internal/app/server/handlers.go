@@ -82,7 +82,12 @@ func (s *server) saveRegister() http.HandlerFunc {
 }
 func (s *server) loginPage() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		execTmpl(w, templates.Lookup("login.html"), nil)
+		errorMessage := ""
+		if errMsg := r.URL.Query().Get("error"); errMsg == "notfound" {
+			errorMessage = "User not found. Please try again."
+		}
+
+		execTmpl(w, templates.Lookup("login.html"), map[string]string{"ErrorMessage": errorMessage})
 	}
 }
 
@@ -91,7 +96,7 @@ func (s *server) login() http.HandlerFunc {
 		s.logger.Println("@ login page")
 		email := r.FormValue("email")
 		password := r.FormValue("password")
-		s.logger.Println(email, password)
+		s.logger.Println(email)
 
 		user := &model.User{
 			Email:    email,
@@ -100,8 +105,9 @@ func (s *server) login() http.HandlerFunc {
 
 		// Authenticate the user
 		if err := s.store.User().Login(user); err != nil {
-			s.logger.Println("redirect - Login() error: ", err)
-			http.Redirect(w, r, "/loginPage", http.StatusBadRequest)
+			// we changed here to include an error message in the query parameters
+			s.logger.Println("Login() error: ", err)
+			http.Redirect(w, r, "/loginPage?error=notfound", http.StatusSeeOther)
 			return
 		}
 
@@ -212,21 +218,30 @@ func execTmpl(w http.ResponseWriter, tmpl *template.Template, data interface{}) 
 		log.Println("Error executing template:", err)
 	}
 }
-
 func (s *server) createPostPage() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		categories, err := s.store.Category().GetAll()
 		if err != nil {
-			// handle error
+			http.Error(w, "Failed to load categories", http.StatusInternalServerError)
+			return
+		}
+
+		errMsg := ""
+		if errParam := r.URL.Query().Get("error"); errParam == "atleast_one_category_required" {
+			errMsg = "At least one category must be selected."
 		}
 
 		data := struct {
-			Categories []*model.Category
+			Categories   []*model.Category
+			ErrorMessage string
 		}{
-			Categories: categories,
+			Categories:   categories,
+			ErrorMessage: errMsg,
 		}
 
-		execTmpl(w, templates.Lookup("createPostPage.html"), data)
+		if err := templates.Lookup("createPostPage.html").Execute(w, data); err != nil {
+			http.Error(w, "Failed to execute template", http.StatusInternalServerError)
+		}
 	}
 }
 
@@ -252,6 +267,16 @@ func (s *server) createPost() http.HandlerFunc {
 		subject := r.FormValue("postTitle")
 		content := r.FormValue("postText")
 
+		// Parse form for category checkboxes
+		r.ParseForm()
+		categoryIDs := r.PostForm["categoryIDs"]
+
+		// validation for post category
+		if len(categoryIDs) == 0 {
+			http.Redirect(w, r, "/createPostPage?error=atleast_one_category_required", http.StatusSeeOther)
+			return
+		}
+
 		post, err := model.NewPost(userUUID, subject, content)
 		if err != nil {
 			s.logger.Println("NewPost() error: ", err)
@@ -265,10 +290,7 @@ func (s *server) createPost() http.HandlerFunc {
 			return
 		}
 
-		// Parse form for category checkboxes
-		r.ParseForm()
-		categoryIDs := r.PostForm["categoryIDs"]
-
+		// add the category to the post
 		for _, categoryIDStr := range categoryIDs {
 			categoryID, err := strconv.Atoi(categoryIDStr)
 			if err != nil {
