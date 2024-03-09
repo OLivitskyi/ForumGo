@@ -17,7 +17,6 @@ func (r *PostRepository) AddCategoryToPost(postID string, categoryID int) error 
 }
 
 func (r *PostRepository) GetAll() ([]*model.Post, error) {
-	// Запит з JOIN операцією для отримання кількості реакцій разом з постами
 	query := `
     SELECT p.id, p.user_UUID, p.subject, p.content, p.created_at,
            COALESCE(SUM(CASE WHEN pr.reaction_id = 1 THEN 1 ELSE 0 END), 0) AS LikeCount,
@@ -33,22 +32,40 @@ func (r *PostRepository) GetAll() ([]*model.Post, error) {
 	}
 	defer rows.Close()
 
-	posts := make([]*model.Post, 0)
+	var posts []*model.Post
+
 	for rows.Next() {
 		var p model.Post
-		// Розширений набір полів для сканування
-		err := rows.Scan(&p.ID, &p.UserID, &p.Subject, &p.Content, &p.CreatedAt, &p.LikeCount, &p.DislikeCount)
+		err := rows.Scan(
+			&p.ID, &p.UserID, &p.Subject, &p.Content, &p.CreatedAt, &p.LikeCount, &p.DislikeCount,
+		)
 		if err != nil {
 			return nil, err
 		}
 
-		// Інша логіка залишається без зміни
+		user, err := r.store.User().GetByUUID(p.UserID)
+		if err != nil {
+			return nil, err
+		}
+		p.User = user
+
+		categories, err := r.GetCategories(p.ID)
+		if err != nil {
+			return nil, err
+		}
+		p.Categories = categories
+
+		comments, err := r.store.Comment().GetCommentsWithReactionsByPostID(p.ID)
+		if err != nil {
+			return nil, err
+		}
+		p.Comments = comments
+
 		posts = append(posts, &p)
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
-
 	return posts, nil
 }
 
@@ -78,25 +95,24 @@ func (r *PostRepository) GetCategories(postID string) ([]*model.Category, error)
 
 func (r *PostRepository) GetByCategory(categoryID int) ([]*model.Post, error) {
 	rows, err := r.store.Db.Query(`
-    SELECT posts.id, posts.user_UUID, posts.subject, posts.content
-    FROM posts
-    INNER JOIN post_categories ON posts.id = post_categories.post_id
-    WHERE post_categories.category_id = ?
-`, categoryID)
-
+        SELECT posts.id, posts.user_UUID, posts.subject, posts.content, posts.created_at
+        FROM posts
+        INNER JOIN post_categories ON posts.id = post_categories.post_id
+        WHERE post_categories.category_id = ?
+    `, categoryID)
 	if err != nil {
 		return nil, err
 	}
-
 	defer rows.Close()
 
-	posts := make([]*model.Post, 0)
+	var posts []*model.Post
 	for rows.Next() {
 		var post model.Post
-		err := rows.Scan(&post.ID, &post.UserID, &post.Subject, &post.Content)
+		err := rows.Scan(&post.ID, &post.UserID, &post.Subject, &post.Content, &post.CreatedAt)
 		if err != nil {
 			return nil, err
 		}
+
 		user, err := r.store.User().GetByUUID(post.UserID)
 		if err != nil {
 			return nil, err
@@ -109,8 +125,7 @@ func (r *PostRepository) GetByCategory(categoryID int) ([]*model.Post, error) {
 		}
 		post.Categories = categories
 
-		// Fetch comments and add to post
-		comments, err := r.store.Comment().GetByPostID(post.ID)
+		comments, err := r.store.Comment().GetCommentsWithReactionsByPostID(post.ID)
 		if err != nil {
 			return nil, err
 		}
@@ -119,7 +134,10 @@ func (r *PostRepository) GetByCategory(categoryID int) ([]*model.Post, error) {
 		posts = append(posts, &post)
 	}
 
-	return posts, rows.Err()
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return posts, nil
 }
 
 func (r *CommentRepository) GetByPostID(postID string) ([]*model.Comment, error) {

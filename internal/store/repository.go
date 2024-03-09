@@ -19,6 +19,7 @@ type PostRepository interface {
 type CommentRepository interface {
 	Create(c *model.Comment) error
 	GetByPostID(postID string) ([]*model.Comment, error)
+	GetCommentsWithReactionsByPostID(postID string) ([]*model.Comment, error)
 }
 
 type ReactionRepository interface {

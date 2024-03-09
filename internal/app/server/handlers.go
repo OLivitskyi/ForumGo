@@ -28,6 +28,7 @@ func (s *server) HandlePaths() {
 	s.router.HandleFunc("/logout", s.logout())
 	s.router.HandleFunc("/createComment", s.createComment())
 	s.router.HandleFunc("/createPostReaction", s.handleCreatePostReaction())
+	s.router.HandleFunc("/reactComment", s.handleCreateCommentReaction())
 }
 
 func (s *server) registerPage() http.HandlerFunc {
@@ -158,11 +159,12 @@ func (s *server) home() http.HandlerFunc {
 			return
 		}
 
-		// Fetching categories and comments for each post.
 		for _, post := range posts {
-			fetchedUser, _ := s.store.User().GetByUUID(post.UserID) // fetch user who created the post
+			// Fetch user who created the post
+			fetchedUser, _ := s.store.User().GetByUUID(post.UserID)
 			post.User = fetchedUser
 
+			// Fetch categories for each post
 			categories, err := s.store.Post().GetCategories(post.ID)
 			if err != nil {
 				s.logger.Println("error fetching categories for post:", err)
@@ -171,35 +173,18 @@ func (s *server) home() http.HandlerFunc {
 			}
 			post.Categories = categories
 
-			// Fetch comments for each post
-			comments, err := s.store.Comment().GetByPostID(post.ID)
+			// Fetch comments with reactions for each post using the updated repository method
+			comments, err := s.store.Comment().GetCommentsWithReactionsByPostID(post.ID)
 			if err != nil {
 				s.logger.Println("error fetching comments for post:", err)
 				http.Error(w, "error fetching post comments", http.StatusInternalServerError)
 				return
 			}
-
 			for _, comment := range comments {
-				// Fetch user who created the comment
 				fetchedUser, _ := s.store.User().GetByUUID(comment.UserID)
 				comment.User = fetchedUser
 			}
-
 			post.Comments = comments
-		}
-
-		// Fetching categories for each post.
-		for _, post := range posts {
-			fetchedUser, _ := s.store.User().GetByUUID(post.UserID)
-			post.User = fetchedUser
-
-			categories, err := s.store.Post().GetCategories(post.ID)
-			if err != nil {
-				s.logger.Println("error fetching categories for post:", err)
-				http.Error(w, "error fetching post categories", http.StatusInternalServerError)
-				return
-			}
-			post.Categories = categories
 		}
 
 		// Fetching all categories.
@@ -365,21 +350,20 @@ func (s *server) categoryPosts() http.HandlerFunc {
 			}
 			post.Categories = categories
 
-			// Fetch comments for each post
-			comments, err := s.store.Comment().GetByPostID(post.ID)
+			// Fetch comments with reactions for each post using the updated repository method
+			commentsWithReactions, err := s.store.Comment().GetCommentsWithReactionsByPostID(post.ID)
 			if err != nil {
-				s.logger.Println("error fetching comments for post:", err)
-				http.Error(w, "error fetching post comments", http.StatusInternalServerError)
+				s.logger.Println("error fetching comments with reactions for post:", err)
+				http.Error(w, "error fetching post comments with reactions", http.StatusInternalServerError)
 				return
 			}
-
-			for _, comment := range comments {
+			for _, comment := range commentsWithReactions {
 				// Fetch user who created the comment
 				fetchedUser, _ := s.store.User().GetByUUID(comment.UserID)
 				comment.User = fetchedUser
 			}
 
-			post.Comments = comments // Attach comments to post
+			post.Comments = commentsWithReactions
 		}
 
 		// Fetch all categories except currently used
@@ -597,20 +581,17 @@ func (s *server) handleCreatePostReaction() http.HandlerFunc {
 		}
 
 		if existingReaction != nil {
-			// Якщо користувач повторює ту саму реакцію, видаляємо існуючу
 			if existingReaction.ReactionID == reactionID {
 				if err := s.store.Reaction().DeletePostReaction(userUUID, postID); err != nil {
 					http.Error(w, "Failed to delete reaction", http.StatusInternalServerError)
 					return
 				}
 			} else {
-				// Якщо користувач змінив тип реакції, видаляємо стару та створюємо нову
 				if err := s.store.Reaction().DeletePostReaction(userUUID, postID); err != nil {
 					http.Error(w, "Failed to delete existing reaction", http.StatusInternalServerError)
 					return
 				}
 
-				// Створення нової реакції після видалення старої
 				reaction := &model.Reaction{
 					UserID:     userUUID,
 					PostID:     postID,
@@ -622,7 +603,6 @@ func (s *server) handleCreatePostReaction() http.HandlerFunc {
 				}
 			}
 		} else {
-			// Якщо реакції на пост від користувача не було, створюємо нову
 			reaction := &model.Reaction{
 				UserID:     userUUID,
 				PostID:     postID,
@@ -635,5 +615,88 @@ func (s *server) handleCreatePostReaction() http.HandlerFunc {
 		}
 
 		http.Redirect(w, r, "/home?postID="+postID, http.StatusSeeOther)
+	}
+}
+
+func (s *server) handleCreateCommentReaction() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if err := r.ParseForm(); err != nil {
+			http.Error(w, "Error parsing form", http.StatusBadRequest)
+			return
+		}
+
+		sessionCookie, err := r.Cookie("session_uuid")
+		if err != nil {
+			http.Error(w, "Session error", http.StatusBadRequest)
+			return
+		}
+
+		session, err := s.store.Session().GetByUUID(sessionCookie.Value)
+		if err != nil {
+			http.Error(w, "Session retrieval error", http.StatusInternalServerError)
+			return
+		}
+
+		userUUID := session.UserUUID
+		commentID := r.FormValue("commentID")
+		reactionTypeStr := r.FormValue("reactionType")
+
+		var reactionID int
+		switch reactionTypeStr {
+		case "like":
+			reactionID = 1
+		case "dislike":
+			reactionID = 2
+		default:
+			http.Error(w, "Invalid reaction type", http.StatusBadRequest)
+			return
+		}
+
+		existingReaction, err := s.store.Reaction().GetUserCommentReaction(userUUID, commentID)
+		if err != nil && err != sql.ErrNoRows {
+			http.Error(w, "Database error", http.StatusInternalServerError)
+			return
+		}
+
+		if existingReaction != nil {
+			if existingReaction.ReactionID == reactionID {
+				if err := s.store.Reaction().DeleteCommentReaction(userUUID, commentID); err != nil {
+					http.Error(w, "Failed to delete reaction", http.StatusInternalServerError)
+					return
+				}
+			} else {
+				if err := s.store.Reaction().DeleteCommentReaction(userUUID, commentID); err != nil {
+					http.Error(w, "Failed to delete existing reaction", http.StatusInternalServerError)
+					return
+				}
+
+				reaction := &model.Reaction{
+					UserID:     userUUID,
+					CommentID:  commentID,
+					ReactionID: reactionID,
+				}
+				if err := s.store.Reaction().CreateCommentReaction(reaction); err != nil {
+					http.Error(w, "Failed to create reaction", http.StatusInternalServerError)
+					return
+				}
+			}
+		} else {
+			reaction := &model.Reaction{
+				UserID:     userUUID,
+				CommentID:  commentID,
+				ReactionID: reactionID,
+			}
+			if err := s.store.Reaction().CreateCommentReaction(reaction); err != nil {
+				http.Error(w, "Failed to create reaction", http.StatusInternalServerError)
+				return
+			}
+		}
+
+		// Redirect to referer or to a default route if not available
+		referer := r.Header.Get("Referer")
+		if referer == "" {
+			referer = "/home"
+		}
+		http.Redirect(w, r, referer, http.StatusSeeOther)
 	}
 }
