@@ -26,6 +26,11 @@
                 <h5 class="card-title m-2">Create a Category</h5>
             </div>
             <div class="card-body">
+                {{if .ErrorMessage}}
+                <div class="alert alert-danger" role="alert">
+                    {{.ErrorMessage}}
+                </div>
+                {{end}}
                 <form method="POST" action="/createCategory">
                     <div class="mb-2">
                         <label for="categoryName" class="form-label">Category Name</label>

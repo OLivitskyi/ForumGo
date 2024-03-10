@@ -14,6 +14,7 @@ type CategoryRepository interface {
 	Create(cate *model.Category) error
 	GetAll() ([]*model.Category, error)
 	AddCategoryToPost(postID string, categoryID int) error
+	Exists(name string) (bool, error)
 }
 type SessionRepository interface {
 	Create(s *model.Session) error

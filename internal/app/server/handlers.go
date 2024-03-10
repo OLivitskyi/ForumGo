@@ -312,15 +312,34 @@ func (s *server) createPost() http.HandlerFunc {
 
 func (s *server) createCategoryPage() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		execTmpl(w, templates.Lookup("createCategory.html"), nil)
+		errorMessage := ""
+		switch r.URL.Query().Get("error") {
+		case "checkError":
+			errorMessage = "Failed to check category existence."
+		case "categoryExists":
+			errorMessage = "This category already exists."
+		}
+		execTmpl(w, templates.Lookup("createCategory.html"), map[string]string{"ErrorMessage": errorMessage})
 	}
 }
 
 func (s *server) createCategory() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		categoryName := r.FormValue("categoryName")
-		category := &model.Category{Name: categoryName}
+		exists, err := s.store.Category().Exists(categoryName)
+		if err != nil {
+			s.logger.Println("Check category existence error: ", err)
+			http.Redirect(w, r, "/createCategoryPage?error=checkError", http.StatusSeeOther)
+			return
+		}
 
+		if exists {
+			s.logger.Println("Category already exists: ", categoryName)
+			http.Redirect(w, r, "/createCategoryPage?error=categoryExists", http.StatusSeeOther)
+			return
+		}
+
+		category := &model.Category{Name: categoryName}
 		if err := s.store.Category().Create(category); err != nil {
 			s.logger.Println("Create category error: ", err)
 			http.Redirect(w, r, "/createCategoryPage", http.StatusSeeOther)

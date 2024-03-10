@@ -20,7 +20,9 @@
             </button>
             <div class="collapse navbar-collapse" id="navbarContent">
                 <ul class="navbar-nav me-auto mb-2 mb-lg-0">
+                    {{if .User}}
                     <a href="/" class="nav-link">Home</a>
+                    {{end}}
                     <li class="nav-item">
                         <div class="nav-item dropdown">
                             <a href="#" class="nav-link dropdown-toggle" role="button" data-bs-toggle="dropdown" aria-expanded="false">Categories</a>
@@ -32,10 +34,14 @@
                         </div>
                     </li>
                     <li class="nav-item">
+                        {{if .User}}
                         <a href="/createPostPage" class="nav-link">Create a Post</a>
+                        {{end}}
                     </li>
                     <li class="nav-item">
+                        {{if .User}}
                         <a href="/createCategoryPage" class="nav-link">Create a Category</a>
+                        {{end}}
                     </li>
                     <li class="nav-item">
                         {{if .User}}

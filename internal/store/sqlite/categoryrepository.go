@@ -41,3 +41,12 @@ func (r *CategoryRepository) AddCategoryToPost(postID string, categoryID int) er
 	_, err := r.store.Db.Exec(`INSERT INTO post_categories (post_id, category_id) VALUES (?, ?)`, postID, categoryID)
 	return err
 }
+
+func (r *CategoryRepository) Exists(name string) (bool, error) {
+	var count int
+	err := r.store.Db.QueryRow(`SELECT COUNT(*) FROM categories WHERE category_name = ?`, name).Scan(&count)
+	if err != nil {
+		return false, err
+	}
+	return count > 0, nil
+}
