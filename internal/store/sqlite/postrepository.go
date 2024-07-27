@@ -2,17 +2,30 @@ package sqlite
 
 import (
 	"Forum/internal/model"
-	"database/sql"
-	"log"
 )
 
 type PostRepository struct {
-	store  *Store
-	Logger *log.Logger
+	store *sqliteStore
+}
+
+func (r *PostRepository) Create(post *model.Post) error {
+	queryInsert := "INSERT INTO posts(id, user_UUID, subject, content, created_at) VALUES(?, ?, ?, ?, ?)"
+	_, err := r.store.db.Exec(queryInsert, post.ID, post.UserID, post.Subject, post.Content, post.CreatedAt)
+	if err != nil {
+		return err
+	}
+
+	for _, category := range post.Categories {
+		if err := r.AddCategoryToPost(post.ID, category.ID); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 func (r *PostRepository) AddCategoryToPost(postID string, categoryID int) error {
-	_, err := r.store.Db.Exec(`INSERT INTO post_categories (post_id, category_id) VALUES (?, ?)`, postID, categoryID)
+	_, err := r.store.db.Exec(`INSERT INTO post_categories (post_id, category_id) VALUES (?, ?)`, postID, categoryID)
 	return err
 }
 
@@ -26,7 +39,7 @@ func (r *PostRepository) GetAll() ([]*model.Post, error) {
     GROUP BY p.id
     `
 
-	rows, err := r.store.Db.Query(query)
+	rows, err := r.store.db.Query(query)
 	if err != nil {
 		return nil, err
 	}
@@ -70,7 +83,7 @@ func (r *PostRepository) GetAll() ([]*model.Post, error) {
 }
 
 func (r *PostRepository) GetCategories(postID string) ([]*model.Category, error) {
-	rows, err := r.store.Db.Query(`
+	rows, err := r.store.db.Query(`
         SELECT categories.id, categories.category_name
         FROM categories, post_categories
         WHERE post_categories.post_id = ?
@@ -94,7 +107,7 @@ func (r *PostRepository) GetCategories(postID string) ([]*model.Category, error)
 }
 
 func (r *PostRepository) GetByCategory(categoryID int) ([]*model.Post, error) {
-	rows, err := r.store.Db.Query(`
+	rows, err := r.store.db.Query(`
         SELECT posts.id, posts.user_UUID, posts.subject, posts.content, posts.created_at
         FROM posts
         INNER JOIN post_categories ON posts.id = post_categories.post_id
@@ -138,43 +151,4 @@ func (r *PostRepository) GetByCategory(categoryID int) ([]*model.Post, error) {
 		return nil, err
 	}
 	return posts, nil
-}
-
-func (r *CommentRepository) GetByPostID(postID string) ([]*model.Comment, error) {
-	rows, err := r.store.Db.Query(`
-		SELECT id, post_id, user_UUID, content, created_at 
-		FROM comments
-		WHERE post_id = ?
-	`, postID)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	comments := make([]*model.Comment, 0)
-	for rows.Next() {
-		var c model.Comment
-		var nullTime sql.NullTime
-		if err := rows.Scan(&c.ID, &c.PostID, &c.UserID, &c.Content, &nullTime); err != nil {
-			return nil, err
-		}
-
-		// If 'created_at' is not NULL, assign its value to the comment 'CreatedAt' field
-		if nullTime.Valid {
-			c.CreatedAt = nullTime.Time
-		}
-
-		// Fetch user who created the comment
-		user, err := r.store.User().GetByUUID(c.UserID)
-		if err != nil {
-			return nil, err
-		}
-		c.User = user
-
-		comments = append(comments, &c)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return comments, nil
 }

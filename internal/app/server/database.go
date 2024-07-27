@@ -100,6 +100,32 @@ func initTables(db *sql.DB) error {
 			expires_at TIMESTAMP NOT NULL,
 			FOREIGN KEY (user_UUID) REFERENCES users (UUID) ON DELETE CASCADE
 		)`,
+		`CREATE TABLE IF NOT EXISTS users (
+			UUID VARCHAR(32) PRIMARY KEY,
+			email VARCHAR(240) UNIQUE NOT NULL,
+			username VARCHAR(32) UNIQUE NOT NULL,
+			password VARCHAR(240) NOT NULL,
+			firstname VARCHAR(100),
+			lastname VARCHAR(100),
+			age INTEGER,
+			gender VARCHAR(10)
+		)`,
+		`CREATE TABLE IF NOT EXISTS messages (
+			message_id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+			sender_id INTEGER NOT NULL,
+			receiver_id INTEGER NOT NULL,
+			content TEXT NOT NULL,
+			created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+			is_read BOOLEAN NOT NULL DEFAULT 0,
+			FOREIGN KEY(sender_id) REFERENCES users(UUID),
+			FOREIGN KEY(receiver_id) REFERENCES users(UUID)
+		)`,
+		`CREATE TABLE IF NOT EXISTS user_status (
+			user_id INTEGER PRIMARY KEY NOT NULL,
+			is_online BOOLEAN NOT NULL DEFAULT 0,
+			last_activity TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+			FOREIGN KEY(user_id) REFERENCES users(UUID)
+		)`,
 	}
 
 	// Execute SQL statements

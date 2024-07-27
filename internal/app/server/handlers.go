@@ -3,6 +3,7 @@ package server
 import (
 	"Forum/internal/model"
 	"database/sql"
+	"encoding/json"
 	"html/template"
 	"log"
 	"net/http"
@@ -29,6 +30,14 @@ func (s *server) HandlePaths() {
 	s.router.HandleFunc("/createComment", s.createComment())
 	s.router.HandleFunc("/createPostReaction", s.handleCreatePostReaction())
 	s.router.HandleFunc("/reactComment", s.handleCreateCommentReaction())
+	s.router.HandleFunc("/send-message", s.sendMessageHandler())
+	s.router.HandleFunc("/get-messages", s.getMessagesHandler())
+	s.router.HandleFunc("/update-status", s.updateStatusHandler())
+	s.router.HandleFunc("/get-user-status", s.getUserStatusHandler())
+	s.router.HandleFunc("/mark-message-read", s.markMessageAsReadHandler())
+	s.router.HandleFunc("/get-users", s.getUsersHandler())
+	s.router.HandleFunc("/ws", s.handleConnections())
+	go s.handleMessages()
 }
 
 func (s *server) registerPage() http.HandlerFunc {
@@ -45,6 +54,10 @@ func (s *server) saveRegister() http.HandlerFunc {
 		email := r.FormValue("email")
 		password := r.FormValue("password")
 		rePassword := r.FormValue("rePassword")
+		firstName := r.FormValue("firstName")
+		lastName := r.FormValue("lastName")
+		age, _ := strconv.Atoi(r.FormValue("age"))
+		gender := r.FormValue("gender")
 
 		// Check if passwords match
 		if password != rePassword {
@@ -62,7 +75,7 @@ func (s *server) saveRegister() http.HandlerFunc {
 			return
 		}
 
-		user, err := model.NewUser(userName, email, password)
+		user, err := model.NewUser(userName, email, password, firstName, lastName, age, gender)
 		if err != nil {
 			s.logger.Println("NewUser() error: ", err)
 			data.ErrorMsg = "Failed to create the user"
@@ -80,6 +93,7 @@ func (s *server) saveRegister() http.HandlerFunc {
 		execTmpl(w, templates.Lookup("main.html"), nil)
 	}
 }
+
 func (s *server) loginPage() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		errorMessage := ""
@@ -218,6 +232,7 @@ func execTmpl(w http.ResponseWriter, tmpl *template.Template, data interface{}) 
 		log.Println("Error executing template:", err)
 	}
 }
+
 func (s *server) createPostPage() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		categories, err := s.store.Category().GetAll()
@@ -431,8 +446,12 @@ func (s *server) registerHandler() http.HandlerFunc {
 		userName := r.FormValue("username")
 		password := r.FormValue("password")
 		email := r.FormValue("email")
+		firstName := r.FormValue("firstName")
+		lastName := r.FormValue("lastName")
+		age, _ := strconv.Atoi(r.FormValue("age"))
+		gender := r.FormValue("gender")
 
-		if userName == "" || password == "" || email == "" {
+		if userName == "" || password == "" || email == "" || firstName == "" || lastName == "" || age == 0 || gender == "" {
 			data := struct {
 				ErrorMsg string
 			}{
@@ -454,7 +473,7 @@ func (s *server) registerHandler() http.HandlerFunc {
 			return
 		}
 
-		user, err := model.NewUser(userName, email, password)
+		user, err := model.NewUser(userName, email, password, firstName, lastName, age, gender)
 		if err != nil {
 			s.logger.Println("NewUser() error: ", err)
 			http.Redirect(w, r, "/registerPage", http.StatusSeeOther)
@@ -740,4 +759,125 @@ func (s *server) handleCreateCommentReaction() http.HandlerFunc {
 		}
 		http.Redirect(w, r, referer, http.StatusSeeOther)
 	}
+}
+
+func (s *server) sendMessageHandler() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		senderID, err := s.getUserIDFromSession(r)
+		if err != nil {
+			http.Error(w, "Unauthorized", http.StatusUnauthorized)
+			return
+		}
+		receiverID, err := strconv.Atoi(r.FormValue("receiver_id"))
+		if err != nil {
+			http.Error(w, "Invalid receiver ID", http.StatusBadRequest)
+			return
+		}
+		content := r.FormValue("content")
+		if err := s.store.Message().AddMessage(senderID, receiverID, content); err != nil {
+			http.Error(w, "Failed to send message", http.StatusInternalServerError)
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+	}
+}
+
+func (s *server) getMessagesHandler() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		userID, err := s.getUserIDFromSession(r)
+		if err != nil {
+			http.Error(w, "Unauthorized", http.StatusUnauthorized)
+			return
+		}
+		otherUserID, err := strconv.Atoi(r.URL.Query().Get("user_id"))
+		if err != nil {
+			http.Error(w, "Invalid user ID", http.StatusBadRequest)
+			return
+		}
+		limit, err := strconv.Atoi(r.URL.Query().Get("limit"))
+		if err != nil {
+			limit = 10
+		}
+		offset, err := strconv.Atoi(r.URL.Query().Get("offset"))
+		if err != nil {
+			offset = 0
+		}
+		messages, err := s.store.Message().GetMessages(userID, otherUserID, limit, offset)
+		if err != nil {
+			http.Error(w, "Failed to get messages", http.StatusInternalServerError)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(messages)
+	}
+}
+
+func (s *server) updateStatusHandler() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		userID, err := s.getUserIDFromSession(r)
+		if err != nil {
+			http.Error(w, "Unauthorized", http.StatusUnauthorized)
+			return
+		}
+		isOnline := r.FormValue("is_online") == "true"
+		if err := s.store.UserStatus().UpdateUserStatus(userID, isOnline); err != nil {
+			http.Error(w, "Failed to update status", http.StatusInternalServerError)
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+	}
+}
+
+func (s *server) getUserStatusHandler() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		statuses, err := s.store.UserStatus().GetUserStatus()
+		if err != nil {
+			http.Error(w, "Failed to get user statuses", http.StatusInternalServerError)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(statuses)
+	}
+}
+
+func (s *server) markMessageAsReadHandler() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		userID, err := s.getUserIDFromSession(r)
+		if err != nil {
+			http.Error(w, "Unauthorized", http.StatusUnauthorized)
+			return
+		}
+		messageID, err := strconv.Atoi(r.FormValue("message_id"))
+		if err != nil {
+			http.Error(w, "Invalid message ID", http.StatusBadRequest)
+			return
+		}
+		if err := s.store.Message().MarkMessageAsRead(messageID, userID); err != nil {
+			http.Error(w, "Failed to mark message as read", http.StatusInternalServerError)
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+	}
+}
+
+func (s *server) getUsersHandler() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		users, err := s.store.User().GetUsersOrderedByLastMessageOrAlphabetically()
+		if err != nil {
+			http.Error(w, "Failed to get users", http.StatusInternalServerError)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(users)
+	}
+}
+
+// helper functions to get user ID from session
+func (s *server) getUserIDFromSession(r *http.Request) (int, error) {
+	cookie, err := r.Cookie("session_uuid")
+	if err != nil {
+		return 0, err
+	}
+	sessionToken := cookie.Value
+	return s.store.Session().GetUserIDFromSession(sessionToken)
 }
