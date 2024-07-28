@@ -1,7 +1,8 @@
-package server
+package handlers
 
 import (
 	"Forum/internal/model"
+	"Forum/internal/store"
 	"log"
 	"net/http"
 	"sync"
@@ -20,7 +21,7 @@ var clients = make(map[*websocket.Conn]int)
 var broadcast = make(chan model.WebSocketMessage)
 var mutex = &sync.Mutex{}
 
-func (s *server) handleConnections() http.HandlerFunc {
+func HandleConnections(store store.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ws, err := upgrader.Upgrade(w, r, nil)
 		if err != nil {
@@ -40,7 +41,7 @@ func (s *server) handleConnections() http.HandlerFunc {
 			return
 		}
 
-		userID, err := s.store.Session().GetUserIDFromSession(sessionToken)
+		userID, err := store.Session().GetUserIDFromSession(sessionToken)
 		if err != nil {
 			log.Printf("Unauthorized access: %v", err)
 			return
@@ -50,7 +51,7 @@ func (s *server) handleConnections() http.HandlerFunc {
 		mutex.Lock()
 		clients[ws] = userID
 		mutex.Unlock()
-		s.store.UserStatus().UpdateUserStatus(userID, true)
+		store.UserStatus().UpdateUserStatus(userID, true)
 
 		for {
 			var msg model.WebSocketMessage
@@ -65,10 +66,10 @@ func (s *server) handleConnections() http.HandlerFunc {
 	}
 }
 
-func (s *server) handleMessages() {
+func HandleMessages(store store.Store) {
 	for {
 		msg := <-broadcast
-		if err := s.store.Message().AddMessage(msg.Sender, msg.Receiver, msg.Content); err != nil {
+		if err := store.Message().AddMessage(msg.Sender, msg.Receiver, msg.Content); err != nil {
 			log.Printf("Error storing message in the database: %v", err)
 			continue
 		}

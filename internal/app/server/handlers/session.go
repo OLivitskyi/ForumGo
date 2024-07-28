@@ -1,5 +1,4 @@
-// internal/app/server/handlers/sessionhandlers.go
-package server
+package handlers
 
 import (
 	"log"
