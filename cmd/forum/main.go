@@ -16,23 +16,3 @@ func main() {
 	// Start the server with the obtained configuration
 	log.Fatal(server.Start(config))
 }
-
-
-/*
-To DO:
-
-*login logic
-
-*authentication - sessions and cookies
-
-*post creation
-
-*create categories
-
-*handle UNIQUE constraint failure
-
-*sanitize and validatge input
-
-*multiple hompage logs?
-
-*/

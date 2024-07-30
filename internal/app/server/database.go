@@ -45,12 +45,6 @@ func initTables(db *sql.DB) error {
 			id INTEGER PRIMARY KEY NOT NULL,
 			reaction_name VARCHAR(55)
 		)`,
-		`CREATE TABLE IF NOT EXISTS users (
-			UUID VARCHAR(32) PRIMARY KEY,
-			email VARCHAR(240) UNIQUE NOT NULL,
-			username VARCHAR(32) UNIQUE NOT NULL,
-			password VARCHAR(240) NOT NULL
-		)`,
 		`CREATE TABLE IF NOT EXISTS posts (
 			id VARCHAR(36) PRIMARY KEY NOT NULL,
 			user_UUID VARCHAR(32) NOT NULL,

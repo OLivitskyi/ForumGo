@@ -1,3 +1,0 @@
-package auth
-
-// authentication logic

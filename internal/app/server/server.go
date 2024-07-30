@@ -6,11 +6,14 @@ import (
 	"html/template"
 	"log"
 	"net/http"
+
+	"github.com/gorilla/mux"
+	"github.com/rs/cors"
 )
 
 type Server struct {
 	Store     store.Store
-	router    *http.ServeMux
+	router    *mux.Router
 	Logger    *log.Logger
 	Templates *template.Template
 }
@@ -18,9 +21,9 @@ type Server struct {
 func NewServer(store store.Store) *Server {
 	return &Server{
 		Store:     store,
-		router:    &http.ServeMux{},
+		router:    mux.NewRouter(),
 		Logger:    log.Default(),
-		Templates: template.Must(template.ParseGlob("./web/templates/*.html")),
+		Templates: template.Must(template.ParseGlob("../../web/templates/*.html")),
 	}
 }
 
@@ -44,12 +47,19 @@ func Start(con Config) error {
 	}
 
 	store := sqlite.NewSQL(db)
-
 	server := NewServer(store)
-
 	server.HandlePaths()
+
+	c := cors.New(cors.Options{
+		AllowedOrigins:   []string{"*"},
+		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE"},
+		AllowedHeaders:   []string{"Content-Type", "Authorization"},
+		AllowCredentials: true,
+	})
+
+	handler := c.Handler(server)
 
 	log.Println("Starting server: http://localhost:8080")
 
-	return http.ListenAndServe(con.Port, server)
+	return http.ListenAndServe(con.Port, handler)
 }

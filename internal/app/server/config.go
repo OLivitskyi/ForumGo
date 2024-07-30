@@ -21,7 +21,7 @@ func NewConfig() Config {
 // ReadConfig reads the configuration from a JSON file and populates the Config struct.
 func (c *Config) ReadConfig() error {
 	// Read JSON data from the config file
-	jsonData, err := os.ReadFile("./configs/config.json")
+	jsonData, err := os.ReadFile("../../configs/config.json")
 	if err != nil {
 		return errors.Join(errors.New("error reading config file"), err)
 	}
