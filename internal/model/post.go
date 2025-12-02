@@ -2,7 +2,7 @@ package model
 
 import (
 	"database/sql"
-	"github.com/gofrs/uuid"
+	"github.com/gofrs/uuid/v5"
 	"time"
 )
 

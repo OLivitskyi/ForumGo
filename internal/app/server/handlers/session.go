@@ -7,7 +7,7 @@ import (
 
 	"Forum/internal/store"
 
-	"github.com/gofrs/uuid"
+	"github.com/gofrs/uuid/v5"
 )
 
 type Session struct {
